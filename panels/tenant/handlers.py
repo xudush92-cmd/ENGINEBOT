@@ -235,6 +235,14 @@ async def set_min_interval(query: CallbackQuery) -> None:
 # ─────────────────────────────────────────────────────────────────────
 # 📺 Kanallarim
 # ─────────────────────────────────────────────────────────────────────
+def _add_channel_kb():
+    """'➕ Kanal ulash' inline tugmasi (Kanallarim panelida ko'rsatiladi)."""
+    return inline_grid(
+        [(Btn.ADD_CHANNEL, "tenant:channel:add")],
+        columns=1,
+    )
+
+
 @router.message(F.text == Btn.MY_CHANNELS)
 async def show_channels(message: Message) -> None:
     if message.from_user is None:
@@ -245,7 +253,8 @@ async def show_channels(message: Message) -> None:
     if not channels:
         await message.answer(
             "📭 Hali kanal ulanmagan.\n\n"
-            "Yangi kanal qo'shish uchun '➕ Kanal ulash' bosing."
+            "Quyidagi tugma orqali kanalingizni ulang:",
+            reply_markup=_add_channel_kb(),
         )
         return
 
@@ -257,22 +266,23 @@ async def show_channels(message: Message) -> None:
             f"{i}. {emoji} <b>{fmt.esc(title)}</b>\n"
             f"   <code>{ch['channel_id']}</code>"
         )
-    await message.answer("\n".join(lines))
+    await message.answer("\n".join(lines), reply_markup=_add_channel_kb())
 
 
-@router.message(F.text == Btn.ADD_CHANNEL)
-async def start_add_channel(message: Message) -> None:
-    if message.from_user is None:
-        return
+async def _begin_add_channel(uid: int) -> str:
+    """
+    Kanal ulash jarayonini boshlash (umumiy mantiq).
 
+    Tekshiruvlardan (rate-limit, tarif limiti) o'tsa — session step
+    o'rnatiladi va ko'rsatma matni qaytadi. Aks holda — xato matni.
+    Ham matnli tugma (ADD_CHANNEL), ham inline tugma shu helper'ni ishlatadi.
+    """
     # Rate limiter — kanal qo'shish (modify action)
     from core.rate_limiter import limiter, get_block_message
-    if not limiter.is_allowed(message.from_user.id, "modify"):
-        msg = get_block_message(message.from_user.id, "modify")
-        if msg:
-            await message.answer(msg)
-        return
-    ctx = await _ensure_tenant(message.from_user.id)
+    if not limiter.is_allowed(uid, "modify"):
+        return get_block_message(uid, "modify") or "⏳ Biroz kuting va qayta urinib ko'ring."
+
+    ctx = await _ensure_tenant(uid)
 
     # Tarif limit tekshirish
     tenant = await db.get_tenant(ctx.user_id)
@@ -280,14 +290,13 @@ async def start_add_channel(message: Message) -> None:
     max_channels = int(get_tariff_limit(tariff, "max_channels", 1) or 1)
     current = len(await db.list_channels(ctx.user_id, only_active=False))
     if current >= max_channels:
-        await message.answer(
+        return (
             f"⛔ Tarifingiz ({tariff.upper()}) max {max_channels} kanal ruxsat beradi.\n"
             f"Tarif yangilash uchun bot egasi bilan bogʻlaning."
         )
-        return
 
-    await session.update(message.from_user.id, step="tenant:awaiting_channel")
-    await message.answer(
+    await session.update(uid, step="tenant:awaiting_channel")
+    return (
         "➕ <b>Kanal ulash</b>\n\n"
         "1️⃣ Avval botni o'z kanalingizga <b>admin</b> qilib qo'shing\n"
         "2️⃣ Keyin kanal @username yoki ID ni shu yerga yuboring\n\n"
@@ -297,6 +306,25 @@ async def start_add_channel(message: Message) -> None:
         "<code>-1001234567890</code>\n\n"
         "<i>Bot get_chat() orqali kanalni avtomatik aniqlaydi.</i>"
     )
+
+
+@router.message(F.text == Btn.ADD_CHANNEL)
+async def start_add_channel(message: Message) -> None:
+    if message.from_user is None:
+        return
+    text = await _begin_add_channel(message.from_user.id)
+    await message.answer(text)
+
+
+@router.callback_query(F.data == "tenant:channel:add")
+async def add_channel_cb(query: CallbackQuery) -> None:
+    """'➕ Kanal ulash' inline tugmasi bosilganda — kanal qo'shishni boshlash."""
+    if query.from_user is None:
+        return
+    text = await _begin_add_channel(query.from_user.id)
+    if query.message:
+        await query.message.answer(text)
+    await query.answer()
 
 
 # ─────────────────────────────────────────────────────────────────────
