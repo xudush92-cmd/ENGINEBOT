@@ -39,10 +39,30 @@ router = Router(name="tenant")
 # ─────────────────────────────────────────────────────────────────────
 # Helper: tenant ekanligini tekshirish
 # ─────────────────────────────────────────────────────────────────────
+async def _resolve_tenant_or_admin(uid: int) -> RoleContext | None:
+    """
+    Foydalanuvchini tenant sifatida aniqlash.
+
+    - Oddiy TENANT bo'lsa — o'sha kontekst.
+    - Super admin "Mening kanalim" rejimida (acting_as_tenant) va o'zining
+      tenant yozuvi bo'lsa — uni ham TENANT sifatida qaytaramiz, shunda
+      bot egasi o'z kanalini ulashi/boshqarishi mumkin.
+    - Aks holda None.
+    """
+    ctx = await resolve_role(uid)
+    if ctx.role == Role.TENANT:
+        return ctx
+    if ctx.role == Role.SUPER_ADMIN:
+        state = await session.get(uid)
+        if state.acting_as_tenant and await db.get_tenant(uid) is not None:
+            return RoleContext(user_id=uid, role=Role.TENANT, tenant_id=uid)
+    return None
+
+
 async def _ensure_tenant(uid: int) -> RoleContext:
     """tenant_id == uid bo'lgan kanal egasi ekanligini tasdiqlash."""
-    ctx = await resolve_role(uid)
-    if ctx.role != Role.TENANT:
+    ctx = await _resolve_tenant_or_admin(uid)
+    if ctx is None:
         raise PermissionDenied("Bu funksiya faqat guruh egasi uchun.")
     return ctx
 
@@ -506,8 +526,8 @@ async def tenant_text_router(message: Message) -> None:
     state = await session.get(message.from_user.id)
     text = (message.text or "").strip()
 
-    ctx = await resolve_role(message.from_user.id)
-    if ctx.role != Role.TENANT:
+    ctx = await _resolve_tenant_or_admin(message.from_user.id)
+    if ctx is None:
         return
 
     # 1) Kanal ulash

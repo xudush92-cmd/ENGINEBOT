@@ -17,7 +17,7 @@ from keyboards.common_kb import Btn, inline_grid, make_reply, toggle_label
 # ─────────────────────────────────────────────────────────────────────
 # Tenant asosiy menyusi
 # ─────────────────────────────────────────────────────────────────────
-def tenant_main_menu():
+def tenant_main_menu(*, is_super_admin: bool = False):
     """
     Guruh egasi asosiy menyusi.
 
@@ -27,15 +27,22 @@ def tenant_main_menu():
     🔗 Havola             🚫 Kategoriyalar
     👤 Profilim           ℹ️ Yordam
     🚪 Chiqish
+
+    is_super_admin=True bo'lsa — bot egasi "Mening kanalim" rejimida,
+    yuqorida "👑 Admin panelga qaytish" tugmasi qo'shiladi.
     """
-    return make_reply([
+    rows = [
         [Btn.MY_CHANNELS, Btn.MANAGE_USERS],
         [Btn.MANAGE_POSTS, Btn.BOT_SETTINGS],
         [Btn.STATS, Btn.AUDIT_LOG],
         [Btn.DEEP_LINK, Btn.CATEGORY_RESTRICTION],
         [Btn.MY_PROFILE, Btn.HELP],
-        [Btn.LOGOUT],
-    ])
+    ]
+    if is_super_admin:
+        rows.append([Btn.EXIT_TENANT_MODE])
+    else:
+        rows.append([Btn.LOGOUT])
+    return make_reply(rows)
 
 
 # ─────────────────────────────────────────────────────────────────────

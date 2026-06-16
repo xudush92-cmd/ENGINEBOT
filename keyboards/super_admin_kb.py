@@ -14,12 +14,14 @@ def super_admin_main_menu():
     👥 Tenantlar         📊 Global statistika
     📜 Muddat tarixi     📨 Broadcast
     📜 Global log        🛠 Tizim
+    🏢 Mening kanalim
     ℹ️ Yordam
     """
     return make_reply([
         [Btn.ALL_TENANTS, Btn.GLOBAL_STATS],
         [Btn.PAYMENTS, Btn.BROADCAST],
         [Btn.GLOBAL_AUDIT, Btn.SYSTEM],
+        [Btn.MY_CHANNEL_MODE],
         [Btn.HELP],
     ])
 

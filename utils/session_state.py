@@ -59,11 +59,14 @@ class SessionData:
     step    : qaysi qadamda turibdi ("asking_phone", "confirming" va h.k.)
     data    : qadamlar davomida yig'ilgan ma'lumotlar (dict)
     tenant_id : qaysi tenant kontekstida (None = global)
+    acting_as_tenant : super admin "Mening kanalim" rejimida (o'z kanalini
+                       boshqarish uchun tenant sifatida ko'radi)
     updated : oxirgi yangilanish (auto-expire uchun)
     """
     step: str = ""
     data: Dict[str, Any] = field(default_factory=dict)
     tenant_id: Optional[int] = None
+    acting_as_tenant: bool = False
     updated: float = field(default_factory=time.time)
 
     def touch(self) -> None:

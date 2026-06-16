@@ -94,6 +94,8 @@ class Btn:
     BROADCAST = "📨 Broadcast"
     SYSTEM = "🛠 Tizim"
     PAYMENTS = "📜 Muddat tarixi"
+    MY_CHANNEL_MODE = "🏢 Mening kanalim"        # super admin → tenant rejimi
+    EXIT_TENANT_MODE = "👑 Admin panelga qaytish"  # tenant rejimi → super admin
 
 
 # ─────────────────────────────────────────────────────────────────────

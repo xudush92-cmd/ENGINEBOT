@@ -17,6 +17,7 @@ from config import (
     BRAND_NAME,
     BRAND_TAGLINE,
     Role,
+    SUPER_ADMIN_ID,
     UserRole,
     UserStatus,
 )
@@ -95,7 +96,11 @@ async def cmd_start(message: Message) -> None:
 
     # Marshrut
     if ctx.role == Role.SUPER_ADMIN:
-        await _greet_super_admin(message, name)
+        # Super admin "Mening kanalim" rejimida bo'lsa — tenant menyu
+        if state.acting_as_tenant and await db.get_tenant(uid) is not None:
+            await _greet_tenant(message, name)
+        else:
+            await _greet_super_admin(message, name)
     elif ctx.role == Role.TENANT:
         await _greet_tenant(message, name)
     elif ctx.role == Role.USER:
@@ -130,6 +135,7 @@ async def _greet_tenant(message: Message, name: str) -> None:
     paid_until = (tenant.get("paid_until") or "")[:10]
     settings = tenant.get("settings", {})
 
+    is_super = message.from_user.id == SUPER_ADMIN_ID
     text = (
         f"🏢 <b>Xush kelibsiz, {name}!</b>\n\n"
         f"⚙️ <b>{BRAND_NAME}</b> — guruh admin paneli\n"
@@ -140,7 +146,9 @@ async def _greet_tenant(message: Message, name: str) -> None:
         f"⏱ Min interval: {settings.get('rotation_interval_min', 10)} daq\n\n"
         "Quyidagi menyu orqali guruhingizni boshqaring:"
     )
-    await message.answer(text, reply_markup=tenant_kb.tenant_main_menu())
+    await message.answer(
+        text, reply_markup=tenant_kb.tenant_main_menu(is_super_admin=is_super)
+    )
 
 
 async def _greet_user(message: Message, name: str, ctx: RoleContext) -> None:
@@ -266,7 +274,11 @@ async def cmd_cancel(message: Message) -> None:
     await message.answer("✅ Bekor qilindi.")
 
     if ctx.role == Role.SUPER_ADMIN:
-        await _greet_super_admin(message, name)
+        state2 = await session.get(message.from_user.id)
+        if state2.acting_as_tenant and await db.get_tenant(message.from_user.id) is not None:
+            await _greet_tenant(message, name)
+        else:
+            await _greet_super_admin(message, name)
     elif ctx.role == Role.TENANT:
         await _greet_tenant(message, name)
     elif ctx.role == Role.USER:

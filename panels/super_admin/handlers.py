@@ -71,6 +71,64 @@ async def _ensure_super(uid: int) -> RoleContext:
 
 
 # ─────────────────────────────────────────────────────────────────────
+# 🏢 "Mening kanalim" — super admin o'z kanalini boshqarish rejimi
+# ─────────────────────────────────────────────────────────────────────
+@router.message(F.text == Btn.MY_CHANNEL_MODE)
+async def enter_my_channel_mode(message: Message) -> None:
+    """Super admin o'zining kanalini ulashi uchun tenant rejimiga o'tadi."""
+    if message.from_user is None or message.from_user.id != SUPER_ADMIN_ID:
+        return
+    uid = message.from_user.id
+
+    # O'z tenant yozuvini ta'minlash (yo'q bo'lsa trial bilan yaratiladi)
+    tenant = await db.get_tenant(uid)
+    if tenant is None:
+        await tenant_manager.register_tenant(
+            uid,
+            name=message.from_user.full_name or "",
+            username=message.from_user.username or "",
+            auto_trial=True,
+        )
+
+    await session.update(uid, acting_as_tenant=True)
+    await audit_log.log_action(
+        actor_role="super_admin",
+        actor_id=uid,
+        action="entered_tenant_mode",
+        tenant_id=uid,
+    )
+
+    from keyboards import tenant_kb
+    await message.answer(
+        "🏢 <b>Kanal egasi rejimi yoqildi</b>\n\n"
+        "Endi o'z kanalingizni ulashingiz va boshqarishingiz mumkin "
+        "(«➕ Kanal ulash»).\n\n"
+        "Admin panelga qaytish uchun «👑 Admin panelga qaytish» tugmasini bosing.",
+        reply_markup=tenant_kb.tenant_main_menu(is_super_admin=True),
+    )
+
+
+@router.message(F.text == Btn.EXIT_TENANT_MODE)
+async def exit_my_channel_mode(message: Message) -> None:
+    """Kanal egasi rejimidan super admin paneliga qaytish."""
+    if message.from_user is None or message.from_user.id != SUPER_ADMIN_ID:
+        return
+    uid = message.from_user.id
+
+    await session.update(uid, acting_as_tenant=False)
+    await session.reset(uid, keep_tenant=True)
+    await audit_log.log_action(
+        actor_role="super_admin",
+        actor_id=uid,
+        action="exited_tenant_mode",
+    )
+    await message.answer(
+        "👑 <b>Admin panelga qaytdingiz.</b>",
+        reply_markup=super_admin_kb.super_admin_main_menu(),
+    )
+
+
+# ─────────────────────────────────────────────────────────────────────
 # 📊 Global statistika
 # ─────────────────────────────────────────────────────────────────────
 @router.message(F.text == Btn.GLOBAL_STATS)
